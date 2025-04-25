@@ -1,8 +1,9 @@
-# Configuring a Kafka Data Streaming Cluster using Strimzi
+# Configuring a Kafka GKE cluster for Data-Streaming Cluster using  the Strimzi Operator
 ![alt text](pictures/1.png)
 ![alt text](pictures/2.png)
 
 ---
+
 ## What is Kafka and What is Data Streaming?
 
 Kafka is an open-source, distributed messaging system designed to handle high-volume, high-throughput, and real-time streaming data. It lets you build streaming data pipelines for reliable data transfer across different systems and applications, to support processing and analysis tasks.
@@ -13,6 +14,7 @@ The core value of using Kafka is to **organize, stream, and track the state of h
 A key feature is Kafka’s ability to **persist data**, allowing it to be **re-read or reprocessed later** using timestamps or offsets — making it a rather versatile tool and ideal for fault-tolerant pipelines and replayable data flows.
 
 ---
+
 ### 🔑 Essential Key Components of Kafka:
 #####  Producer:
 > An application or system that **sends data into Kafka**.  
@@ -45,6 +47,7 @@ A key feature is Kafka’s ability to **persist data**, allowing it to be **re-r
 *Whew A lot of unique and specific Vocabulary*
 
 ---
+
 ## My Deployment Strategy
 
 When preparing a Kafka deployment, designing for fault tolerance isn’t optional — it’s the entire point. Without resilient architecture, you lose the operational strengths Kafka was built for: high availability, fault tolerance, and event replayability.
@@ -52,6 +55,7 @@ When preparing a Kafka deployment, designing for fault tolerance isn’t optiona
 My deployment follows the guidance outlined in Google’s official [Strimzi on GKE tutorial](https://cloud.google.com/kubernetes-engine/docs/tutorials/apache-kafka-strimzi), adapted for production-readiness and tested for stability across availability zones.
 
 I provisioned a regional GKE cluster spanning three zones, each with its own dedicated node pool. Each pool has autoscaling enabled independently to handle demand within that specific zone. More importantly, I labeled each node to match the affinity rules defined in the Strimzi CRDs. This labeling is essential because the pod affinity configuration ensures one Kafka broker and one Zookeeper node per zone — achieving true 1:1 distribution. This strategy supports the most effective failover behavior, ensuring resilience during rolling updates or zonal outages.
+
 
 *Affinity Label for Kafka*
 ```yaml
@@ -85,6 +89,7 @@ I provisioned a regional GKE cluster spanning three zones, each with its own ded
               strimzi.io/cluster: my-cluster
               strimzi.io/component-type: kafka
 ```
+
 
 *Affinity label for Zookeeper*
 ```yaml
@@ -121,6 +126,7 @@ I provisioned a regional GKE cluster spanning three zones, each with its own ded
     }
 ```
 
+
 Kafka, by nature, is resource intensive. I selected the `n2-standard-8` machine type for each node, giving me 8 vCPUs and 32 GB of memory per instance. This provides a stable foundation to run Strimzi's operator, brokers, Zookeeper, and entity operators without contention. I recommend provisioning at least two of these nodes during initial deployment to give the cluster enough capacity to launch all core components successfully.
 
 Another critical detail is the configuration of readiness and liveness probes. These are easy to misconfigure in Kafka, and doing so can trigger premature restarts, memory leaks, or even partition loss if probes aren’t aligned with Kafka’s startup behavior. It's vital to design them conservatively and test upgrades to ensure they support your workload, rather than disrupt it.
@@ -132,13 +138,15 @@ The manifests and Terraform infrastructure for this deployment live in my repo, 
 ---
 ## Cluster and Operator Deployment
 
-1. Make sure to increase your Resource quota for your desired region to at least 24 CPUs before using my configuration. 
+1. Make sure to increase your Resource quota for your desired region to at least 24 CPUs before using my configuration.
+
 2.  Git clone my Repository; deploy the cluster from top level and await completion.
 ```shell
 git clone 
 # >>>
 terraform apply --var-file=003-change_me.tfvars --auto-approve
 ```
+
 3. After completion and signing into your cluster Use helm to install the Strimzi operator; and check the pod status for completion.
 ```shell
 helm repo add strimzi https://strimzi.io/charts/
@@ -153,16 +161,19 @@ kubectl get pods -n kafka
 ```
 *This will take a few moments to correctly install, be patient*
 
+
 4. Now we can deploy our main working broker and zookeeper pods
 ```shell
 kubectl apply -f cluster
 ```
 *This will take even longer so be even more patient*
 
+
 You should have 8 pods upon full configuration:
 ![alt text](pictures/4.png)
 
 ---
+
 ## User-Identity, Topic, and Producer Deployment
 
 In this configuration The topic will be created server side prior to the message request being initiated. We will create a client pod/application within the cluster to generate and send messages to our topic. 
@@ -170,6 +181,7 @@ In this configuration The topic will be created server side prior to the message
 In our Demo example our testing application plays both roles of the *Producer* and the *Consumer* by making the request to both produce data and consume it.
 
 We give our producer client permissions to write to our topic using the below CRD with Custom Resource which will create a username and password with RBAC permissions. The *strong-password* is then automatically stored as a Kubernetes  secret which we can mount as a `volume` and `env` on our producer application. 
+
 
 *User Custom Resource*
 ```yaml
@@ -205,6 +217,7 @@ spec:
 ```
 - *Do note that communication between our broker and producer can be encrypted using ssl. But this is disabled through the initiated configmap for lab demonstration purposes.*
 
+
 *The Producer application (This consumes the user credentials from kubectl secrets and will serve as the platform to execute our sample message batch)*
 ```yaml
 apiVersion: v1
@@ -231,7 +244,9 @@ spec:
       name: kcat-config
 ```
 
-##### Now that we understand what we're working with, let's begin the deployment
+
+### Now that we understand what we're working with, let's begin the deployment
+
 
 1. Change directories into the `Users` folder and Create your Topic and user Identity
 ```shell
@@ -240,15 +255,18 @@ kubectl apply -n kafka -f topic.yaml
 kubectl apply -n kafka -f my-user.yaml
 ```
 
+
 2. Now create the Producer application and wait a few moments for a successful deployment
 ```shell
 kubectl apply -n kafka -f kafkacat.yaml
 ```
 
+
 3. After confirmation of completion, Exec inside of the pod so we can initiate our message request.
 ```shell
 kubectl exec -it kafkacat -n kafka -- /bin/sh
 ```
+
 
 4. Now After inside Copy and paste the entirety of the below command to create our first request to test our brokers.  
 
@@ -286,6 +304,7 @@ Message from my-user
 % Reached end of topic my-topic [0] at offset 0
 % Reached end of topic my-topic [2] at offset 0
 ```
+
 
 ![alt text](pictures/5.png)
 
