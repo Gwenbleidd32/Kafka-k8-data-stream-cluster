@@ -164,7 +164,7 @@ kubectl get pods -n kafka
 
 4. Now we can deploy our main working broker and zookeeper pods
 ```shell
-kubectl apply -f cluster
+kubectl apply -f cluster-dep
 ```
 *This will take even longer so be even more patient*
 
