@@ -1,4 +1,4 @@
-# Configuring a Kafka GKE cluster for Data-Streaming Cluster using  the Strimzi Operator
+# Configuring a Kafka GKE cluster for Data-Streaming using the Strimzi Operator
 ![alt text](pictures/1.png)
 ![alt text](pictures/2.png)
 
